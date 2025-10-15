@@ -1,4 +1,5 @@
-#include "os.h"
+#include <stdarg.h>
+#include <stddef.h>
 
 extern int uart_putc(char);
 extern void uart_puts(char *);
