@@ -127,3 +127,8 @@ char uart_getc()
         ;
     return uart_read_reg(RHR);
 }
+
+void kecho(void)
+{
+    /* Finish the function */
+}
