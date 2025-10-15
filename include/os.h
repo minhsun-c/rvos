@@ -6,5 +6,6 @@
 
 #include "platform.h"
 #include "types.h"
+#include "defs.h"
 
 #endif /* __OS_H__ */
