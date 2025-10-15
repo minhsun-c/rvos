@@ -1,5 +1,8 @@
 #include "os.h"
 
+extern int uart_putc(char);
+extern void uart_puts(char *);
+
 static int _vsnprintf(char *out, size_t n, const char *s, va_list vl)
 {
     int format = 0;

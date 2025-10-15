@@ -1,31 +1,28 @@
 #include <stdarg.h>
 #include "os.h"
 
+extern int uart_putc(char);
+extern void uart_puts(char *);
+extern char uart_getc();
+
 static void read_from_uart(char *buf, int maxlen)
 {
-    int pos = 0;
-    for (;;) {
+    int pos;
+    for (pos = 0; pos < maxlen - 1;) {
         char ch = uart_getc();
 
-        // Handle backspace (optional)
         if (ch == '\b' || ch == 0x7f) {
             if (pos > 0) {
                 pos--;
                 uart_puts("\b \b");
             }
             continue;
-        }
-
-        // Stop at space or newline
-        if (ch == ' ' || ch == '\n' || ch == '\r') {
+        } else if (ch == ' ' || ch == '\n' || ch == '\r') {
             uart_putc('\n');
             break;
-        }
-
-        // Store char
-        if (pos < maxlen - 1) {
+        } else {
             buf[pos++] = ch;
-            uart_putc(ch);  // echo back
+            uart_putc(ch);
         }
     }
     buf[pos] = '\0';
@@ -57,7 +54,6 @@ static void parse_int(int *ptr)
 static int _vscanf(const char *fmt, va_list ap)
 {
     int read_cnt = 0;
-    char buf[64];
 
     while (*fmt) {
         if (*fmt == '%') {
