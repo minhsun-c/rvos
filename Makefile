@@ -12,9 +12,11 @@ OBJDUMP = ${CROSS_COMPILE}objdump
 LINK_SCRIPT = kernel.ld
 
 SRCS_ASM += $(wildcard ./startup/*.S)
+SRCS_ASM += $(wildcard ./kernel/*.S)
 
 SRCS_C   += $(wildcard ./lib/*.c)
 SRCS_C   += $(wildcard ./kernel/*.c)
+SRCS_C   += $(wildcard ./test/*.c)
 
 INC += -I./include
 

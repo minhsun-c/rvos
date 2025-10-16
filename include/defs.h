@@ -1,15 +1,29 @@
 #ifndef __DEFS_H__
 #define __DEFS_H__
 
-/* printf */
-int kprintf(const char *s, ...);
+#include <stddef.h>
+#include "types.h"
+
+/* printf.c */
+int kprintf(const char *, ...);
 void panic(char *s);
 
-/* scanf */
-int kscanf(const char *fmt, ...);
+/* scanf.c */
+int kscanf(const char *, ...);
 
-/* page */
+/* memory.c */
+void *memset(void *, int, size_t);
+void *memcpy(void *, const void *, size_t);
+
+/* kalloc.c */
 void *malloc(size_t);
 void free(void *);
+
+/* task.c */
+void schedule(void);
+task_t *task_init(const char *, taskFunc_t, void *, size_t, uint16_t);
+void task_startup(task_t *);
+uint32_t task_resume(task_t *);
+uint32_t task_yield(void);
 
 #endif  // __DEFS_H__
