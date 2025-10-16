@@ -1,5 +1,5 @@
-#include "types.h"
 #include <stddef.h>
+#include "types.h"
 
 // Symbols provided by the linker script
 extern char TEXT_START[];
