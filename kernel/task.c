@@ -4,6 +4,7 @@
 #include "defs.h"
 #include "list.h"
 #include "riscv.h"
+#include "spinlock.h"
 #include "task.h"
 #include "types.h"
 
@@ -19,6 +20,7 @@ task_t task_list[256];       /* Static task pool */
 task_t *task_running = NULL; /* Currently running task */
 task_t task_ready;           /* Ready queue head (sentinel node) */
 uint32_t task_idx;           /* Next TCB index for allocation */
+spinlock_t task_lock;
 
 /* -------------------------------------------------------------------------- */
 /*                              Core Scheduler                                */
@@ -36,6 +38,7 @@ void sched_init(void)
     w_mscratch(0);                     /* Ensure first switch_to sees NULL */
     list_init((list_t *) &task_ready); /* Ready queue sentinel node */
     task_idx = 0;                      /* Reset TCB index */
+    spinlock_init(&task_lock);
 }
 
 /**
@@ -48,6 +51,8 @@ void sched_init(void)
  */
 void schedule(void)
 {
+    acquire(&task_lock);
+
     /* Pick next task */
     task_t *nextTask = (task_t *) task_ready.node.next;
     ctx_t *next = &nextTask->ctx;
@@ -63,6 +68,8 @@ void schedule(void)
     /* Switch to next task */
     task_running = nextTask;
     nextTask->state = TASK_RUNNING;
+
+    release(&task_lock);
     switch_to(next);
 }
 
@@ -77,8 +84,10 @@ void schedule(void)
  */
 static task_t *get_task(void)
 {
+    acquire(&task_lock);
     task_t *tcb = &task_list[task_idx];
     task_idx = (task_idx + 1) & 0xFF; /* Wrap around at 256 */
+    release(&task_lock);
     return tcb;
 }
 
@@ -144,13 +153,18 @@ void task_startup(task_t *ptcb)
  */
 uint32_t task_resume(task_t *ptcb)
 {
-    if (ptcb->state != TASK_SUSPEND)
+    acquire(&task_lock);
+
+    if (ptcb->state != TASK_SUSPEND) {
+        release(&task_lock);
         return -1;
+    }
 
     list_remove((list_t *) ptcb);
     list_insert_before((list_t *) &task_ready, (list_t *) ptcb);
     ptcb->state = TASK_READY;
 
+    release(&task_lock);
     return 0;
 }
 
@@ -162,6 +176,7 @@ uint32_t task_resume(task_t *ptcb)
  */
 uint32_t task_yield(void)
 {
+    acquire(&task_lock);
     task_t *ptcb = task_running;
 
     if (ptcb->state == TASK_READY) {
@@ -170,6 +185,7 @@ uint32_t task_yield(void)
         /* Reinsert at the tail of the ready queue */
         list_insert_before((list_t *) &task_ready, (list_t *) ptcb);
     }
+    release(&task_lock);
 
     schedule();
     return 0;

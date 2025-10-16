@@ -15,4 +15,7 @@ typedef void (*taskFunc_t)(void *);
 /* list.h */
 typedef struct list list_t;
 
+/* spinlock.h */
+typedef struct spinlock spinlock_t;
+
 #endif  // __TYPES_H__

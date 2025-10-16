@@ -26,4 +26,9 @@ void task_startup(task_t *);
 uint32_t task_resume(task_t *);
 uint32_t task_yield(void);
 
+/* spinlock.c */
+void spinlock_init(spinlock_t *);
+int acquire(spinlock_t *);
+int release(spinlock_t *);
+
 #endif  // __DEFS_H__
