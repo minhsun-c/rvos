@@ -4,7 +4,7 @@ CFLAGS        = -nostdlib -fno-builtin -march=rv32imazicsr -mabi=ilp32 -g -Wall
 QEMU   = qemu-system-riscv32
 QFLAGS = -nographic -smp 1 -machine virt -bios none
 
-GDB     = gdb-multiarch
+GDB    ?= $(shell command -v $(CROSS_COMPILE)gdb || command -v gdb-multiarch || command -v gdb)
 CC      = ${CROSS_COMPILE}gcc
 OBJCOPY = ${CROSS_COMPILE}objcopy
 OBJDUMP = ${CROSS_COMPILE}objdump
@@ -41,7 +41,7 @@ run: all
 .PHONY: debug
 debug: all
 	@${QEMU} ${QFLAGS} -kernel os.elf -s -S &
-	@${GDB} os.elf -q -x ../gdbinit
+	@${GDB} os.elf -q -x gdbinit
 
 debug_vscode: all
 	@${QEMU} ${QFLAGS} -kernel os.elf -s -S &
