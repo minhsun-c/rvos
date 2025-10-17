@@ -1,4 +1,6 @@
 #include <stddef.h>
+#include "defs.h"
+#include "list.h"
 #include "types.h"
 
 // Symbols provided by the linker script
@@ -13,187 +15,159 @@ extern char BSS_END[];
 extern char HEAP_START[];
 extern char HEAP_SIZE[];
 
-/*
- * Heap allocation metadata
- * -------------------------
- * _alloc_start : the actual starting address of the allocatable heap region
- * _alloc_end   : the actual ending address of the allocatable heap region
- * _num_pages   : total number of allocatable pages
- */
-static uint32_t _alloc_start = 0;
-static uint32_t _alloc_end = 0;
-static uint32_t _num_pages = 0;
+#define ALIGNMENT 8U
+#define MIN_PAYLOAD ALIGNMENT
 
-/*
- * Page configuration
- * -------------------
- * PAGE_SIZE  : size of each physical page (256 bytes here)
- * PAGE_ORDER : log2(PAGE_SIZE)
- */
-#define PAGE_SIZE 256
-#define PAGE_ORDER 8
+list_t alloc_list;
+list_t free_list;
 
-/*
- * Page flags
- * ----------
- * PAGE_TAKEN : page is allocated
- * PAGE_LAST  : marks the last page of an allocated block
- */
-#define PAGE_TAKEN (uint8_t) (1 << 0)
-#define PAGE_LAST (uint8_t) (1 << 1)
+typedef struct __attribute__((aligned(ALIGNMENT))) MemHeader {
+    uint32_t start_addr;
+    size_t size;
+    list_t list;
+} MemHeader_t;
 
-/*
- * Page Descriptor
- * ----------------
- * Each page has a 1-byte flag field indicating its status.
- *
- * flags:
- *  - bit 0 (PAGE_TAKEN): set if this page is allocated
- *  - bit 1 (PAGE_LAST): set if this page is the last page of a block
- */
-struct Page {
-    uint8_t flags;
-};
-
-// ---------------------------------------------------------------------------
-// Helper functions to manipulate page flags
-// ---------------------------------------------------------------------------
-static inline void _clear(struct Page *page)
+static inline uint32_t _align_up(uint32_t address)
 {
-    page->flags = 0;
+    uint32_t mask = ALIGNMENT - 1;
+    return (address + mask) & (~mask);
 }
 
-static inline int _is_free(struct Page *page)
+static inline uint32_t _align_down(uint32_t address)
 {
-    return !(page->flags & PAGE_TAKEN);
+    uint32_t mask = ALIGNMENT - 1;
+    return (address - mask) & (~mask);
 }
 
-static inline void _set_flag(struct Page *page, uint8_t flags)
-{
-    page->flags |= flags;
-}
-
-static inline int _is_last(struct Page *page)
-{
-    return !!(page->flags & PAGE_LAST);
-}
-
-/*
- * Align the given address up to the nearest page boundary.
- * This ensures that the heap allocation region starts on a
- * properly aligned page address.
- */
-static inline uint32_t _align_page(uint32_t address)
-{
-    uint32_t order = (1 << PAGE_ORDER) - 1;
-    return (address + order) & (~order);
-}
-
-/*
- * Initialize page descriptors and heap metadata.
- *
- * We reserve 2048 pages at the beginning of the heap for the page
- * descriptor array itself. The remaining pages form the allocatable
- * heap region. Each Page struct corresponds to one physical page.
- */
 void page_init()
 {
-    _num_pages = ((uint32_t) HEAP_SIZE / PAGE_SIZE) - 2048;
+    list_init(&free_list);
+    list_init(&alloc_list);
 
-    struct Page *page = (struct Page *) HEAP_START;
-    for (int i = 0; i < _num_pages; i++) {
-        _clear(page);
-        page++;
-    }
+    uint32_t heap_end =
+        _align_down((uint32_t) HEAP_START + (uint32_t) HEAP_SIZE);
+    uint32_t hdr_start = _align_up((uint32_t) HEAP_START);
+    MemHeader_t *hdr = (MemHeader_t *) hdr_start;
+    uint32_t payload_start = (uint32_t) (hdr + 1);
 
-    _alloc_start = _align_page((uint32_t) HEAP_START + 2048 * PAGE_SIZE);
-    _alloc_end = _alloc_start + (PAGE_SIZE * _num_pages);
+    if (payload_start >= heap_end)
+        panic("Heap is too small");
+
+    hdr->start_addr = payload_start;
+    hdr->size = heap_end - hdr->start_addr;
+    list_insert_after(&free_list, &hdr->list);
 }
 
-/*
- * Allocate a block of contiguous pages.
- * - npages: number of pages to allocate.
- *
- * The allocator performs a simple first-fit search through the page
- * descriptor array. It looks for npages consecutive free pages,
- * sets their PAGE_TAKEN flags, and marks the last page with PAGE_LAST.
- *
- * Returns: pointer to the start of the allocated block, or NULL on failure.
- */
-static void *page_alloc(int npages)
+static void *page_alloc(size_t size)
 {
-    int found = 0;
-    struct Page *page_i = (struct Page *) HEAP_START;
-    for (int i = 0; i <= (_num_pages - npages); i++) {
-        if (_is_free(page_i)) {
-            found = 1;
+    size_t request = _align_up(size);  // aligned payload only
 
-            // Check the following (npages - 1) pages for availability
-            struct Page *page_j = page_i;
-            for (int j = i; j < (i + npages); j++) {
-                if (!_is_free(page_j)) {
-                    found = 0;
-                    break;
-                }
-                page_j++;
-            }
+    for (list_t *node = free_list.next; node != &free_list; node = node->next) {
+        MemHeader_t *hdr = list_entry(node, MemHeader_t, list);
+        if (hdr->size < request)
+            continue;
 
-            // If found a contiguous block, mark it and return the address
-            if (found) {
-                struct Page *page_k = page_i;
-                for (int k = i; k < (i + npages); k++) {
-                    _set_flag(page_k, PAGE_TAKEN);
-                    page_k++;
-                }
-                page_k--;
-                _set_flag(page_k, PAGE_LAST);
-                return (void *) (_alloc_start + i * PAGE_SIZE);
-            }
+        // Current free block payload range
+        uint32_t old_start = (uint32_t) hdr->start_addr;
+        uint32_t old_end = old_start + hdr->size;
+
+        // Allocated payload range
+        uint32_t alloc_start = old_start;
+        uint32_t alloc_end = alloc_start + request;
+
+        // Start of tail: place a new header, then align payload start after it
+        uint32_t new_hdr_addr = _align_up((uint32_t) alloc_end);
+        uint32_t new_payload_start =
+            (uint32_t) (new_hdr_addr + sizeof(MemHeader_t));
+
+        // True tail payload bytes remaining (after header + padding)
+        size_t remain = (new_payload_start <= old_end)
+                            ? (size_t) (old_end - new_payload_start)
+                            : 0;
+
+        if (remain >= MIN_PAYLOAD) {
+            // Split: [hdr | payload | hdr_split | payload]
+            MemHeader_t *hdr_split = (MemHeader_t *) new_hdr_addr;
+            hdr_split->start_addr = (uint32_t) new_payload_start;
+            hdr_split->size = remain;  // payload only
+
+            // Shrink allocated block to exactly 'request'
+            hdr->size = request;
+
+            // Replace current free node with the tail free node
+            list_replace(&hdr->list, &hdr_split->list);
+        } else {
+            // No room for a valid tail; give whole block
+            list_remove(&hdr->list);
         }
-        page_i++;
+
+        // move header to allocated list
+        list_insert_before(&alloc_list, &hdr->list);
+        return (void *) hdr->start_addr;
     }
-    return NULL;
+
+    return NULL;  // no suitable block
 }
 
-/*
- * Free a previously allocated page block.
- * - p: start address of the memory block to free
- *
- * The function walks through the corresponding page descriptors
- * starting from p, clearing flags until the PAGE_LAST page is reached.
- * Invalid pointers are ignored.
- */
+
 static void page_free(void *p)
 {
-    if (!p || (uint32_t) p >= _alloc_end) {
+    if (!p)
         return;
-    }
 
-    struct Page *page = (struct Page *) HEAP_START;
-    page += ((uint32_t) p - _alloc_start) / PAGE_SIZE;
+    MemHeader_t *hdr =
+        (MemHeader_t *) p - 1;  // header immediately before payload
 
-    while (!_is_free(page)) {
-        if (_is_last(page)) {
-            _clear(page);
-            break;
-        } else {
-            _clear(page);
-            page++;
-        }
-    }
+    // Move from alloc_list back to free_list
+    list_remove(&hdr->list);
+
+    // (Optional) insert in address-sorted order for coalescing; for now:
+    list_insert_after(&free_list, &hdr->list);
 }
 
 void *malloc(size_t size)
 {
-    int res = size % PAGE_SIZE;
-    int npages = size / PAGE_SIZE;
-
-    if (res > 0)
-        npages++;
-    return page_alloc(npages);
+    if (size > 0)
+        return page_alloc(size);
+    else
+        return NULL;
 }
 
 void free(void *p)
 {
     page_free(p);
+}
+
+void malloc_test(void)
+{
+    kprintf("=== malloc_test ===\n");
+
+    void *p1 = malloc(31);
+    void *p2 = malloc(64);
+    void *p3 = malloc(128);
+
+    kprintf("p1 = %p\n", p1);
+    kprintf("p2 = %p\n", p2);
+    kprintf("p3 = %p\n", p3);
+
+    // Check alignment
+    if (((unsigned int) p1 & (ALIGNMENT - 1)) != 0)
+        kprintf("p1 not aligned!\n");
+    if (((unsigned int) p2 & (ALIGNMENT - 1)) != 0)
+        kprintf("p2 not aligned!\n");
+    if (((unsigned int) p3 & (ALIGNMENT - 1)) != 0)
+        kprintf("p3 not aligned!\n");
+
+    free(p2);  // free middle block
+
+    void *p4 = malloc(256);
+    kprintf("p4 = %p\n", p4);
+
+    void *p5 = malloc(48);  // should reuse p2's block
+    kprintf("p5 = %p\n", p5);
+
+    free(p1);
+    free(p3);
+    free(p4);
+    free(p5);
 }
