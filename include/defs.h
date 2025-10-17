@@ -31,4 +31,7 @@ void spinlock_init(spinlock_t *);
 int acquire(spinlock_t *);
 int release(spinlock_t *);
 
+/* trap.c */
+uint32_t trap_handler(uint32_t, uint32_t);
+
 #endif  // __DEFS_H__
