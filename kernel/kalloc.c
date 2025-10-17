@@ -39,6 +39,18 @@ static inline uint32_t _align_down(uint32_t address)
     return (address - mask) & (~mask);
 }
 
+static inline void memheader_init(MemHeader_t *hdr, size_t size)
+{
+    hdr->start_addr = (uint32_t) (hdr + 1);
+    hdr->size = size;
+    list_init(&hdr->list);
+}
+
+static inline uint32_t _block_end(MemHeader_t *hdr, size_t size)
+{
+    return hdr->start_addr + size;
+}
+
 void page_init()
 {
     list_init(&free_list);
@@ -46,15 +58,14 @@ void page_init()
 
     uint32_t heap_end =
         _align_down((uint32_t) HEAP_START + (uint32_t) HEAP_SIZE);
-    uint32_t hdr_start = _align_up((uint32_t) HEAP_START);
-    MemHeader_t *hdr = (MemHeader_t *) hdr_start;
+    MemHeader_t *hdr = (MemHeader_t *) _align_up((uint32_t) HEAP_START);
     uint32_t payload_start = (uint32_t) (hdr + 1);
+    uint32_t payload_size = heap_end - payload_start;
 
     if (payload_start >= heap_end)
         panic("Heap is too small");
 
-    hdr->start_addr = payload_start;
-    hdr->size = heap_end - hdr->start_addr;
+    memheader_init(hdr, payload_size);
     list_insert_after(&free_list, &hdr->list);
 }
 
@@ -67,29 +78,20 @@ static void *page_alloc(size_t size)
         if (hdr->size < request)
             continue;
 
-        // Current free block payload range
-        uint32_t old_start = (uint32_t) hdr->start_addr;
-        uint32_t old_end = old_start + hdr->size;
+        uint32_t block_end = _block_end(hdr, hdr->size);
 
-        // Allocated payload range
-        uint32_t alloc_start = old_start;
-        uint32_t alloc_end = alloc_start + request;
-
-        // Start of tail: place a new header, then align payload start after it
-        uint32_t new_hdr_addr = _align_up((uint32_t) alloc_end);
+        uint32_t new_hdr_addr = _align_up(_block_end(hdr, request));
         uint32_t new_payload_start =
-            (uint32_t) (new_hdr_addr + sizeof(MemHeader_t));
+            (uint32_t) ((MemHeader_t *) new_hdr_addr + 1);
 
-        // True tail payload bytes remaining (after header + padding)
-        size_t remain = (new_payload_start <= old_end)
-                            ? (size_t) (old_end - new_payload_start)
+        size_t remain = (new_payload_start <= block_end)
+                            ? (size_t) (block_end - new_payload_start)
                             : 0;
 
         if (remain >= MIN_PAYLOAD) {
             // Split: [hdr | payload | hdr_split | payload]
             MemHeader_t *hdr_split = (MemHeader_t *) new_hdr_addr;
-            hdr_split->start_addr = (uint32_t) new_payload_start;
-            hdr_split->size = remain;  // payload only
+            memheader_init(hdr_split, remain);
 
             // Shrink allocated block to exactly 'request'
             hdr->size = request;
