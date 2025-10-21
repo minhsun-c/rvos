@@ -36,7 +36,7 @@ static inline uint32_t _align_up(uint32_t address)
 static inline uint32_t _align_down(uint32_t address)
 {
     uint32_t mask = ALIGNMENT - 1;
-    return (address - mask) & (~mask);
+    return address & (~mask);
 }
 
 static inline void memheader_init(MemHeader_t *hdr, size_t size)
