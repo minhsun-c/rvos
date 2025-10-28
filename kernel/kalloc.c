@@ -14,6 +14,7 @@ extern char BSS_START[];
 extern char BSS_END[];
 extern char HEAP_START[];
 extern char HEAP_SIZE[];
+extern char HEAP_END[];
 
 #define ALIGNMENT 8U
 #define MIN_PAYLOAD ALIGNMENT
@@ -56,8 +57,7 @@ void page_init()
     list_init(&free_list);
     list_init(&alloc_list);
 
-    uint32_t heap_end =
-        _align_down((uint32_t) HEAP_START + (uint32_t) HEAP_SIZE);
+    uint32_t heap_end = _align_down((uint32_t) HEAP_END);
     MemHeader_t *hdr = (MemHeader_t *) _align_up((uint32_t) HEAP_START);
     uint32_t payload_start = (uint32_t) (hdr + 1);
     uint32_t payload_size = heap_end - payload_start;
