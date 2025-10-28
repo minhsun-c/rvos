@@ -3,50 +3,52 @@
 #include "types.h"
 
 #define DELAY 40000000L
-static void myDelay(int Delay) {
-    for (unsigned long long i=0;i<Delay;i++);
+static void myDelay(int Delay)
+{
+    for (unsigned long long i = 0; i < Delay; i++)
+        ;
 }
 
 void my_trap()
 {
-    int a = *(int *)0x00000000;
-	a = 100;
-	kprintf("Return back from trap! %d\n", a);
+    int a = *(int *) 0x00000000;
+    a = 100;
+    kprintf("Return back from trap! %d\n", a);
 }
 
 void user_task0(void *p)
 {
-	kprintf("Task 0: Created!\n");
+    kprintf("Task 0: Created!\n");
 
-	while (1){
-		kprintf("Task 0: Running... \n");
+    while (1) {
+        kprintf("Task 0: Running... \n");
         myDelay(DELAY);
-		my_trap();
+        my_trap();
         task_yield();
-		kprintf("return Task 0 \n");
-	}
+        kprintf("return Task 0 \n");
+    }
 }
 
 void user_task1(void *p)
 {
-	kprintf("Task 1: Created!\n");
-	while (1) {
-		kprintf("Task 1: Running... \n");
-		myDelay(DELAY);
+    kprintf("Task 1: Created!\n");
+    while (1) {
+        kprintf("Task 1: Running... \n");
+        myDelay(DELAY);
         task_yield();
         kprintf("return Task 1 \n");
-	}
+    }
 }
 
 void user_task2(void *p)
 {
-	kprintf("Task 2: Created!\n");
-	while (1) {
-		kprintf("Task 2: Running... \n");
-		myDelay(DELAY);
+    kprintf("Task 2: Created!\n");
+    while (1) {
+        kprintf("Task 2: Running... \n");
+        myDelay(DELAY);
         task_yield();
         kprintf("return Task 2 \n");
-	}
+    }
 }
 
 void trap_test(void)

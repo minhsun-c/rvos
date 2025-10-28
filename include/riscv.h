@@ -28,7 +28,7 @@ static inline void w_mscratch(uint32_t x)
 /* Machine-mode interrupt vector */
 static inline void w_mtvec(uint32_t x)
 {
-	asm volatile("csrw mtvec, %0" : : "r" (x));
+    asm volatile("csrw mtvec, %0" : : "r"(x));
 }
 
 #endif  // __RISCV_H__

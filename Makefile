@@ -56,4 +56,4 @@ clean:
 
 .PHONY: indent
 indent:
-	clang-format -i $(SRCS_C) include/*
+	clang-format -i $(SRCS_C) include/*.h

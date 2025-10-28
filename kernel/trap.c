@@ -1,15 +1,15 @@
-#include "types.h"
 #include "defs.h"
 #include "riscv.h"
+#include "types.h"
 
 extern char trap_vector[];
 
 void trap_init()
 {
-	/*
-	 * set the trap-vector base-address for machine-mode
-	 */
-	w_mtvec((uint32_t)trap_vector);
+    /*
+     * set the trap-vector base-address for machine-mode
+     */
+    w_mtvec((uint32_t) trap_vector);
 }
 
 uint32_t trap_handler(uint32_t epc, uint32_t cause)
@@ -36,7 +36,7 @@ uint32_t trap_handler(uint32_t epc, uint32_t cause)
     } else {
         /* Synchronous trap - exception */
         kprintf("[trap] Sync exception, code = %lu\n", cause_code);
-        return_pc += 4;   // skip faulting instruction (no C extension)
+        return_pc += 4;  // skip faulting instruction (no C extension)
     }
 
     return return_pc;
