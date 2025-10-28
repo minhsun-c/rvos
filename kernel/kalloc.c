@@ -4,16 +4,7 @@
 #include "types.h"
 
 // Symbols provided by the linker script
-extern char TEXT_START[];
-extern char TEXT_END[];
-extern char DATA_START[];
-extern char DATA_END[];
-extern char RODATA_START[];
-extern char RODATA_END[];
-extern char BSS_START[];
-extern char BSS_END[];
 extern char HEAP_START[];
-extern char HEAP_SIZE[];
 extern char HEAP_END[];
 
 #define ALIGNMENT 8U
