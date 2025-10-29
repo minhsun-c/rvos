@@ -105,7 +105,7 @@ task_t *task_init(const char *name,
                   size_t stack_size,
                   uint16_t priority)
 {
-    void *stack_start = (void *) malloc(stack_size);
+    void *stack_start = (void *) kalloc(stack_size);
     if (stack_start == NULL)
         return NULL;
 

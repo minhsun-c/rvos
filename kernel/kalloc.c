@@ -43,7 +43,7 @@ static inline uint32_t _block_end(MemHeader_t *hdr, size_t size)
     return hdr->start_addr + size;
 }
 
-void page_init()
+void kmem_init()
 {
     list_init(&free_list);
     list_init(&alloc_list);
@@ -60,7 +60,7 @@ void page_init()
     list_insert_after(&free_list, &hdr->list);
 }
 
-static void *page_alloc(size_t size)
+static void *kmem_alloc(size_t size)
 {
     size_t request = _align_up(size);  // aligned payload only
 
@@ -103,7 +103,7 @@ static void *page_alloc(size_t size)
 }
 
 
-static void page_free(void *p)
+static void kmem_free(void *p)
 {
     if (!p)
         return;
@@ -118,26 +118,26 @@ static void page_free(void *p)
     list_insert_after(&free_list, &hdr->list);
 }
 
-void *malloc(size_t size)
+void *kalloc(size_t size)
 {
     if (size > 0)
-        return page_alloc(size);
+        return kmem_alloc(size);
     else
         return NULL;
 }
 
-void free(void *p)
+void kfree(void *p)
 {
-    page_free(p);
+    kmem_free(p);
 }
 
-void malloc_test(void)
+void kalloc_test(void)
 {
-    kprintf("=== malloc_test ===\n");
+    kprintf("=== kalloc_test ===\n");
 
-    void *p1 = malloc(31);
-    void *p2 = malloc(64);
-    void *p3 = malloc(128);
+    void *p1 = kalloc(31);
+    void *p2 = kalloc(64);
+    void *p3 = kalloc(128);
 
     kprintf("p1 = %p\n", p1);
     kprintf("p2 = %p\n", p2);
@@ -151,16 +151,16 @@ void malloc_test(void)
     if (((unsigned int) p3 & (ALIGNMENT - 1)) != 0)
         kprintf("p3 not aligned!\n");
 
-    free(p2);  // free middle block
+    kfree(p2);  // free middle block
 
-    void *p4 = malloc(256);
+    void *p4 = kalloc(256);
     kprintf("p4 = %p\n", p4);
 
-    void *p5 = malloc(48);  // should reuse p2's block
+    void *p5 = kalloc(48);  // should reuse p2's block
     kprintf("p5 = %p\n", p5);
 
-    free(p1);
-    free(p3);
-    free(p4);
-    free(p5);
+    kfree(p1);
+    kfree(p3);
+    kfree(p4);
+    kfree(p5);
 }

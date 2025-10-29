@@ -16,8 +16,8 @@ void *memset(void *, int, size_t);
 void *memcpy(void *, const void *, size_t);
 
 /* kalloc.c */
-void *malloc(size_t);
-void free(void *);
+void *kalloc(size_t);
+void kfree(void *);
 
 /* task.c */
 void schedule(void);
