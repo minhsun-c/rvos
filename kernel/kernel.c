@@ -10,5 +10,6 @@ void start_kernel(void)
     kprintf("Hello, RVOS!\n");
 
     kalloc_test();
-    while(1);
+    while (1)
+        ;
 }
