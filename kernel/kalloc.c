@@ -9,6 +9,7 @@ extern char HEAP_END[];
 
 #define ALIGNMENT 8U
 #define MIN_PAYLOAD ALIGNMENT
+#define MIN_BLOCKSIZE (sizeof(MemHeader_t) + MIN_PAYLOAD)
 
 list_t alloc_list;
 list_t free_list;
