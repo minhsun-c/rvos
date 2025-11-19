@@ -102,21 +102,53 @@ static void *kmem_alloc(size_t size)
     return NULL;  // no suitable block
 }
 
+static void kmem_coalesce(MemHeader_t *cur_hdr)
+{
+    if (cur_hdr->list.prev != &free_list) {
+        MemHeader_t *prev = list_entry(cur_hdr->list.prev, MemHeader_t, list);
+
+        uint32_t prev_end = _block_end(prev, prev->size);
+
+        if (prev_end == (uint32_t) cur_hdr) {
+            prev->size += sizeof(MemHeader_t) + cur_hdr->size;
+            list_remove(&cur_hdr->list);
+            cur_hdr = prev;
+        }
+    }
+
+    if (cur_hdr->list.next != &free_list) {
+        MemHeader_t *next = list_entry(cur_hdr->list.next, MemHeader_t, list);
+
+        uint32_t hdr_end = _block_end(cur_hdr, cur_hdr->size);
+
+        if (hdr_end == (uint32_t) next) {
+            cur_hdr->size += sizeof(MemHeader_t) + next->size;
+            list_remove(&next->list);
+        }
+    }
+}
 
 static void kmem_free(void *p)
 {
     if (!p)
         return;
 
-    MemHeader_t *hdr =
-        (MemHeader_t *) p - 1;  // header immediately before payload
+    MemHeader_t *hdr = (MemHeader_t *) p - 1;
 
-    // Move from alloc_list back to free_list
     list_remove(&hdr->list);
 
-    // (Optional) insert in address-sorted order for coalescing; for now:
-    list_insert_after(&free_list, &hdr->list);
+    for (list_t *node = free_list.next; node != &free_list; node = node->next) {
+        MemHeader_t *cur = list_entry(node, MemHeader_t, list);
+
+        if (cur->start_addr > hdr->start_addr) {
+            list_insert_before(node, &hdr->list);
+            break;
+        }
+    }
+
+    kmem_coalesce(hdr);
 }
+
 
 void *kalloc(size_t size)
 {
