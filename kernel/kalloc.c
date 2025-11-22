@@ -50,6 +50,10 @@ static void *kmem_alloc(size_t size)
     /* Finish the function */
 }
 
+static void kmem_coalesce(MemHeader_t *cur_hdr)
+{
+    /* Finish the function */
+}
 
 static void kmem_free(void *p)
 {
