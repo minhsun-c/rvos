@@ -31,4 +31,29 @@ static inline void w_mtvec(uint32_t x)
     asm volatile("csrw mtvec, %0" : : "r"(x));
 }
 
+/* Machine-mode Interrupt Enable */
+#define MIE_MEIE (1 << 11)  // external
+#define MIE_MTIE (1 << 7)   // timer
+#define MIE_MSIE (1 << 3)   // software
+
+
+static inline uint32_t r_mhartid()
+{
+    uint32_t x;
+    asm volatile("csrr %0, mhartid" : "=r"(x));
+    return x;
+}
+
+static inline uint32_t r_mie()
+{
+    uint32_t x;
+    asm volatile("csrr %0, mie" : "=r"(x));
+    return x;
+}
+
+static inline void w_mie(uint32_t x)
+{
+    asm volatile("csrw mie, %0" : : "r"(x));
+}
+
 #endif  // __RISCV_H__

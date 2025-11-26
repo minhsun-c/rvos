@@ -3,6 +3,7 @@
 #include "types.h"
 
 extern char trap_vector[];
+extern void timer_handler(void);
 
 void trap_init()
 {
@@ -24,7 +25,7 @@ uint32_t trap_handler(uint32_t epc, uint32_t cause)
             kprintf("[trap] software interrupt\n");
             break;
         case 7:
-            kprintf("[trap] timer interrupt\n");
+            timer_handler();
             break;
         case 11:
             kprintf("[trap] external interrupt\n");
