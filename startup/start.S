@@ -59,7 +59,10 @@ park:
 #   total size = STACK_SIZE * MAXNUM_CPU
 # Each hart’s stack starts at: stacks + (hartid * STACK_SIZE)
 # ============================================================
+    .section .bss            
+    .align 4                 
+    .global stacks                  # Make it visible to C code
 stacks:
-    .skip   STACK_SIZE * MAXNUM_CPU # Allocate memory for all stacks
+    .skip STACK_SIZE * MAXNUM_CPU
 
     .end                            # End of assembly file
