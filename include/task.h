@@ -89,7 +89,7 @@ struct context {
  * linkage to the ready/suspend lists.
  */
 struct task {
-    list_t node; /**< List node for ready/suspend queue linkage */
+    list_t list; /**< List node for ready/suspend queue linkage */
 
     char name[10];   /**< Human-readable name (not null-terminated if full) */
     uint32_t taskID; /**< Task ID or index in task pool */

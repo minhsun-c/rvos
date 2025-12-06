@@ -35,9 +35,9 @@ spinlock_t task_lock;
  */
 void sched_init(void)
 {
-    w_mscratch(0);                     /* Ensure first switch_to sees NULL */
-    list_init((list_t *) &task_ready); /* Ready queue sentinel node */
-    task_idx = 0;                      /* Reset TCB index */
+    w_mscratch(0); /* Ensure first switch_to sees NULL */
+    list_init((list_t *) &task_ready.list); /* Ready queue sentinel node */
+    task_idx = 0;                           /* Reset TCB index */
     spinlock_init(&task_lock);
 }
 
@@ -54,15 +54,15 @@ void schedule(void)
     acquire(&task_lock);
 
     /* Pick next task */
-    task_t *nextTask = (task_t *) task_ready.node.next;
+    task_t *nextTask = list_entry(task_ready.list.next, task_t, list);
     ctx_t *next = &nextTask->ctx;
-    list_remove((list_t *) nextTask);
+    list_remove(&nextTask->list);
 
     /* Put the current task back into the ready queue */
     if (task_running != NULL) {
         task_t *currentTask = task_running;
         currentTask->state = TASK_READY;
-        list_insert_before((list_t *) &task_ready, (list_t *) currentTask);
+        list_insert_before(&task_ready.list, &currentTask->list);
     }
 
     /* Switch to next task */
@@ -128,7 +128,7 @@ task_t *task_init(const char *name,
     ptcb->state = TASK_INIT;
 
     /* Insert task as an isolated list node */
-    list_init((list_t *) ptcb);
+    list_init(&ptcb->list);
 
     return ptcb;
 }
@@ -160,8 +160,8 @@ uint32_t task_resume(task_t *ptcb)
         return -1;
     }
 
-    list_remove((list_t *) ptcb);
-    list_insert_before((list_t *) &task_ready, (list_t *) ptcb);
+    list_remove(&ptcb->list);
+    list_insert_before(&task_ready.list, &ptcb->list);
     ptcb->state = TASK_READY;
 
     release(&task_lock);
@@ -181,9 +181,9 @@ uint32_t task_yield(void)
 
     if (ptcb->state == TASK_READY) {
         /* Remove task from its current position */
-        list_remove((list_t *) ptcb);
+        list_remove(&ptcb->list);
         /* Reinsert at the tail of the ready queue */
-        list_insert_before((list_t *) &task_ready, (list_t *) ptcb);
+        list_insert_before(&task_ready.list, &ptcb->list);
     }
     release(&task_lock);
 
