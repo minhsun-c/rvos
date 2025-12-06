@@ -8,7 +8,7 @@ extern char HEAP_START[];
 extern char HEAP_END[];
 
 // Symbols provided by the assembly
-extern char stacks[]; 
+extern char stacks[];
 
 #define ALIGNMENT 8U
 #define MIN_PAYLOAD ALIGNMENT
