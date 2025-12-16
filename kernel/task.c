@@ -11,7 +11,7 @@
 /* -------------------------------------------------------------------------- */
 /*                            External Declarations                           */
 /* -------------------------------------------------------------------------- */
-extern void switch_to(struct context *);
+extern void switch_to(ctx_t *prev, ctx_t *next);
 
 /* -------------------------------------------------------------------------- */
 /*                                 Globals                                    */
@@ -21,6 +21,7 @@ task_t *task_running = NULL; /* Currently running task */
 task_t task_ready;           /* Ready queue head (sentinel node) */
 uint32_t task_idx;           /* Next TCB index for allocation */
 spinlock_t task_lock;
+ctx_t ctx_sched;
 
 /* -------------------------------------------------------------------------- */
 /*                              Core Scheduler                                */
@@ -42,35 +43,58 @@ void sched_init(void)
 }
 
 /**
- * @brief Pick the next task from the ready queue and perform a context switch.
- *
- * - Remove the next task from the ready list
- * - Reinsert current task back to ready list if applicable
- * - Update task_running pointer
- * - Switch to the new task context
+ * @brief The Core Scheduler Loop
+ * * This function never returns. It continuously:
+ * 1. Checks if there is a task in the ready queue.
+ * 2. Switches context from Scheduler -> User Task.
+ * 3. Waits for User Task to yield (switches back User Task -> Scheduler).
+ * 4. Puts the yielded task back in the queue and repeats.
  */
 void schedule(void)
 {
-    acquire(&task_lock);
+    task_t *next_task;
+    struct context *next_ctx;
 
-    /* Pick next task */
-    task_t *nextTask = list_entry(task_ready.list.next, task_t, list);
-    ctx_t *next = &nextTask->ctx;
-    list_remove(&nextTask->list);
+    while (1) {
+        acquire(&task_lock);
 
-    /* Put the current task back into the ready queue */
-    if (task_running != NULL) {
-        task_t *currentTask = task_running;
-        currentTask->state = TASK_READY;
-        list_insert_before(&task_ready.list, &currentTask->list);
+        if (list_empty(&task_ready.list)) {
+            release(&task_lock);
+            asm volatile("wfi");  // Wait for interrupt to save power */
+            continue;
+        }
+
+        /* Pick next task from the head of the ready list */
+        next_task = list_entry(task_ready.list.next, task_t, list);
+        list_remove(&next_task->list);
+
+        task_running = next_task;
+        next_task->state = TASK_RUNNING;
+        next_ctx = &next_task->ctx;
+
+        release(&task_lock);
+
+        /* Switch context: Scheduler -> User Task */
+        switch_to(&ctx_sched, next_ctx);
+
+        /* ------------------------------------------------------------ */
+        /* CPU EXECUTION RESUMES HERE WHEN USER TASK CALLS task_yield() */
+        /* ------------------------------------------------------------ */
+
+        acquire(&task_lock);
+
+        if (task_running != NULL) {
+            if (task_running->state == TASK_RUNNING) {
+                task_running->state = TASK_READY;
+                list_insert_before(&task_ready.list, &task_running->list);
+            }
+
+            /* Indicate we are back in Kernel Scheduler */
+            task_running = NULL;
+        }
+
+        release(&task_lock);
     }
-
-    /* Switch to next task */
-    task_running = nextTask;
-    nextTask->state = TASK_RUNNING;
-
-    release(&task_lock);
-    switch_to(next);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -171,22 +195,17 @@ uint32_t task_resume(task_t *ptcb)
 /**
  * @brief Yield CPU from the current running task.
  *
- * - Move the current task to the end of the ready queue
- * - Trigger the scheduler
+ * This function performs a context switch from the User Task back to the
+ * Kernel Scheduler Loop.
+ *
+ * @return 0
  */
 uint32_t task_yield(void)
 {
-    acquire(&task_lock);
-    task_t *ptcb = task_running;
+    task_t *curr = task_running;
 
-    if (ptcb->state == TASK_READY) {
-        /* Remove task from its current position */
-        list_remove(&ptcb->list);
-        /* Reinsert at the tail of the ready queue */
-        list_insert_before(&task_ready.list, &ptcb->list);
-    }
-    release(&task_lock);
+    /* Switch context: User Task -> Scheduler */
+    switch_to(&curr->ctx, &ctx_sched);
 
-    schedule();
     return 0;
 }
