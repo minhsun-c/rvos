@@ -50,5 +50,10 @@ static inline void list_replace(list_t *old, list_t *new)
     list_remove(old);
 }
 
+static inline int list_empty(list_t *head)
+{
+    return (head->next == head);
+}
+
 
 #endif  // __LIST_H__
