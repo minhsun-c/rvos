@@ -3,5 +3,3 @@
 #define SYS_STACK_SIZE 256
 #define USER_STACK_SIZE 1024
 #define PRIO_LEVEL 256
-/* interval ~= 1s */
-#define SYSTEM_TICK CLINT_TIMEBASE_FREQ
