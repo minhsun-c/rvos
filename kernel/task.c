@@ -52,49 +52,7 @@ void sched_init(void)
  */
 void schedule(void)
 {
-    task_t *next_task;
-    struct context *next_ctx;
-
-    while (1) {
-        acquire(&task_lock);
-
-        if (list_empty(&task_ready.list)) {
-            release(&task_lock);
-            asm volatile("wfi");  // Wait for interrupt to save power */
-            continue;
-        }
-
-        /* Pick next task from the head of the ready list */
-        next_task = list_entry(task_ready.list.next, task_t, list);
-        list_remove(&next_task->list);
-
-        task_running = next_task;
-        next_task->state = TASK_RUNNING;
-        next_ctx = &next_task->ctx;
-
-        release(&task_lock);
-
-        /* Switch context: Scheduler -> User Task */
-        switch_to(&ctx_sched, next_ctx);
-
-        /* ------------------------------------------------------------ */
-        /* CPU EXECUTION RESUMES HERE WHEN USER TASK CALLS task_yield() */
-        /* ------------------------------------------------------------ */
-
-        acquire(&task_lock);
-
-        if (task_running != NULL) {
-            if (task_running->state == TASK_RUNNING) {
-                task_running->state = TASK_READY;
-                list_insert_before(&task_ready.list, &task_running->list);
-            }
-
-            /* Indicate we are back in Kernel Scheduler */
-            task_running = NULL;
-        }
-
-        release(&task_lock);
-    }
+    /* Finish the function */
 }
 
 /* -------------------------------------------------------------------------- */
@@ -202,10 +160,5 @@ uint32_t task_resume(task_t *ptcb)
  */
 uint32_t task_yield(void)
 {
-    task_t *curr = task_running;
-
-    /* Switch context: User Task -> Scheduler */
-    switch_to(&curr->ctx, &ctx_sched);
-
-    return 0;
+    /* Finish the function */
 }
