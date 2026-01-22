@@ -1,8 +1,17 @@
+VGA_ENABLE ?= 0
+
 CROSS_COMPILE = riscv64-unknown-elf-
 CFLAGS        = -nostdlib -fno-builtin -march=rv32imazicsr -mabi=ilp32 -g -Wall
+CFLAGS       += -Wl,--no-warn-rwx-segments
 
-QEMU   = qemu-system-riscv32
-QFLAGS = -nographic -smp 1 -machine virt -bios none
+ifeq ($(VGA_ENABLE), 1)
+    CFLAGS += -DVGA_NYANCAT_TEST
+endif
+
+QEMU    = qemu-system-riscv32
+Q_BASE_FLAGS = -nographic -smp 1 -machine virt -bios none
+Q_VGA_FLAGS  = -smp 1 -machine virt -bios none -m 256M -monitor stdio
+Q_VGA_FLAGS += -device virtio-vga -display cocoa,zoom-to-fit=on
 
 GDB    ?= $(shell command -v $(CROSS_COMPILE)gdb || command -v gdb-multiarch || command -v gdb)
 CC      = ${CROSS_COMPILE}gcc
@@ -36,15 +45,20 @@ objs/%.o: ${SRCS_ASM} ${SRCS_C}
 
 run: all
 	@${QEMU} -M ? | grep virt >/dev/null || exit
-	@${QEMU} ${QFLAGS} -kernel os.elf
+	@${QEMU} ${Q_BASE_FLAGS} -kernel os.elf
+
+run-vga: 
+	@$(MAKE) all VGA_ENABLE=1
+	@${QEMU} -M ? | grep virt >/dev/null || exit
+	@${QEMU} ${Q_VGA_FLAGS} -kernel os.elf
 
 .PHONY: debug
 debug: all
-	@${QEMU} ${QFLAGS} -kernel os.elf -s -S &
+	@${QEMU} ${Q_BASE_FLAGS} -kernel os.elf -s -S &
 	@${GDB} os.elf -q -x gdbinit
 
 debug_vscode: all
-	@${QEMU} ${QFLAGS} -kernel os.elf -s -S &
+	@${QEMU} ${Q_BASE_FLAGS} -kernel os.elf -s -S &
 
 .PHONY: code
 code: all
